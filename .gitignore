@@ -18,3 +18,21 @@ source/css/*.map
 Thumbs.db
 _temp/*
 MyInvest.code-workspace
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Pytest
+.pytest_cache/
+
+# Application database (local data, not committed)
+myinvest.db
+
+# Virtual environment
+.venv/
+venv/
+env/

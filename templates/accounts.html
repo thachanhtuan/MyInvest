@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Счета{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>Счета</h2>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#accountModal" onclick="openCreateAccount()">
+    <i class="bi bi-plus-lg me-1"></i>Добавить счёт
+  </button>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr><th>ID</th><th>Название</th><th>Тип</th><th>Брокер/Банк</th><th>Валюта</th><th>Примечание</th><th></th></tr>
+      </thead>
+      <tbody id="accounts-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="accountModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="accountModalTitle">Счёт</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="accountForm">
+          <input type="hidden" id="acc-mode"/>
+          <div class="mb-3">
+            <label class="form-label">ID *</label>
+            <input class="form-control" id="acc-id" required/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Название *</label>
+            <input class="form-control" id="acc-name" required/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Тип *</label>
+            <select class="form-select" id="acc-type">
+              <option value="broker">Брокерский</option>
+              <option value="iis">ИИС</option>
+              <option value="deposit">Депозит</option>
+              <option value="savings">Накопительный</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Брокер/Банк *</label>
+            <input class="form-control" id="acc-broker" required/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Валюта</label>
+            <input class="form-control" id="acc-currency" placeholder="RUB"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Примечание</label>
+            <textarea class="form-control" id="acc-notes" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button class="btn btn-primary" onclick="saveAccount()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Удалить счёт?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">Вы уверены?</div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Нет</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn">Удалить</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let accounts = [];
+
+async function loadAccounts() {
+  accounts = await fetch('/api/accounts').then(r=>r.json()).catch(()=>[]);
+  renderAccounts();
+}
+
+function renderAccounts() {
+  const tbody = document.getElementById('accounts-table');
+  tbody.innerHTML = '';
+  accounts.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${a.id}</td><td>${a.name}</td><td>${a.type}</td>
+      <td>${a.broker_or_bank}</td><td>${a.currency||'—'}</td><td>${a.notes||'—'}</td>
+      <td>
+        <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditAccount('${a.id}')"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete('${a.id}')"><i class="bi bi-trash"></i></button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function openCreateAccount() {
+  document.getElementById('accountModalTitle').textContent = 'Новый счёт';
+  document.getElementById('acc-mode').value = 'create';
+  document.getElementById('accountForm').reset();
+  document.getElementById('acc-id').disabled = false;
+}
+
+function openEditAccount(id) {
+  const a = accounts.find(x=>x.id===id);
+  if (!a) return;
+  document.getElementById('accountModalTitle').textContent = 'Редактировать счёт';
+  document.getElementById('acc-mode').value = 'edit';
+  document.getElementById('acc-id').value = a.id;
+  document.getElementById('acc-id').disabled = true;
+  document.getElementById('acc-name').value = a.name;
+  document.getElementById('acc-type').value = a.type;
+  document.getElementById('acc-broker').value = a.broker_or_bank;
+  document.getElementById('acc-currency').value = a.currency||'';
+  document.getElementById('acc-notes').value = a.notes||'';
+  const modal = new bootstrap.Modal(document.getElementById('accountModal'));
+  modal.show();
+}
+
+async function saveAccount() {
+  const mode = document.getElementById('acc-mode').value;
+  const id = document.getElementById('acc-id').value.trim();
+  const body = {
+    id,
+    name: document.getElementById('acc-name').value.trim(),
+    type: document.getElementById('acc-type').value,
+    broker_or_bank: document.getElementById('acc-broker').value.trim(),
+    currency: document.getElementById('acc-currency').value.trim()||null,
+    notes: document.getElementById('acc-notes').value.trim()||null,
+  };
+  const url = mode==='create' ? '/api/accounts' : `/api/accounts/${id}`;
+  const method = mode==='create' ? 'POST' : 'PUT';
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if (res.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('accountModal')).hide();
+    loadAccounts();
+  } else {
+    const err = await res.json();
+    alert(err.detail||'Ошибка');
+  }
+}
+
+function confirmDelete(id) {
+  const btn = document.getElementById('confirmDeleteBtn');
+  btn.onclick = async () => {
+    await fetch(`/api/accounts/${id}`, {method:'DELETE'});
+    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+    loadAccounts();
+  };
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+loadAccounts();
+</script>
+{% endblock %}
