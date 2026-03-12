@@ -121,12 +121,13 @@ def test_portfolio_value_with_quote(db):
 def test_portfolio_value_fallback_valuation(db):
     _setup_base(db)
     _add_tx(db, "SBER", "buy", 100, 260.0)
+    # AssetValuation.value is the TOTAL portfolio value (not per-unit)
     db.add(AssetValuation(date=date(2024, 6, 1), ticker="SBER", value=32000.0, currency="RUB"))
     db.commit()
     h = get_holdings(db)
     pv = get_portfolio_value(db, h)
-    # No quote, should use valuation (note: valuation.value is total, not per-unit)
-    assert pv["SBER"]["market_value"] is not None
+    # No quote → fallback to valuation. market_value = val.value = 32000.0 (total, not qty * val.value)
+    assert abs(pv["SBER"]["market_value"] - 32000.0) < 0.01
 
 
 def test_unrealized_pnl(db):

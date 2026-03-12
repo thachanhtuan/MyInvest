@@ -92,23 +92,23 @@ def get_holdings(
     return {t: v for t, v in holdings.items() if v["quantity"] > 1e-9}
 
 
-def _latest_price(db: Session, ticker: str, as_of_date: Optional[date] = None) -> Optional[float]:
-    """Return most recent quote, fallback to most recent valuation."""
+def _latest_quote_price(db: Session, ticker: str, as_of_date: Optional[date] = None) -> Optional[float]:
+    """Return the most recent per-unit close price from quotes."""
     q = db.query(Quote).filter(Quote.ticker == ticker)
     if as_of_date:
         q = q.filter(Quote.date <= as_of_date)
     quote = q.order_by(Quote.date.desc()).first()
-    if quote:
-        return quote.close_price
+    return quote.close_price if quote else None
 
+
+def _latest_valuation(
+    db: Session, ticker: str, as_of_date: Optional[date] = None
+) -> Optional[AssetValuation]:
+    """Return the most recent AssetValuation record (total portfolio value, not per-unit)."""
     v = db.query(AssetValuation).filter(AssetValuation.ticker == ticker)
     if as_of_date:
         v = v.filter(AssetValuation.date <= as_of_date)
-    val = v.order_by(AssetValuation.date.desc()).first()
-    if val and val.value is not None:
-        return val.value
-
-    return None
+    return v.order_by(AssetValuation.date.desc()).first()
 
 
 def get_portfolio_value(
@@ -121,8 +121,26 @@ def get_portfolio_value(
         qty = h["quantity"]
         avg_cost = h["avg_cost"]
         total_cost = h["total_cost"]
-        price = _latest_price(db, ticker, as_of_date)
-        market_value = qty * price if price is not None else None
+
+        # Try per-unit quote price first
+        price = _latest_quote_price(db, ticker, as_of_date)
+        if price is not None:
+            market_value = qty * price
+        else:
+            # Fallback: AssetValuation.value is the TOTAL value reported by the broker
+            val = _latest_valuation(db, ticker, as_of_date)
+            if val is not None and val.value is not None:
+                market_value = val.value
+                price = val.value / qty if qty else None
+            elif val is not None and val.value_pct is not None:
+                # Bond-style: value_pct is % of face value
+                bond = db.query(BondInfo).filter(BondInfo.ticker == ticker).first()
+                face = bond.face_value if bond else 1000.0
+                price = face * val.value_pct / 100
+                market_value = qty * price
+            else:
+                market_value = None
+
         unrealized_pnl = (market_value - total_cost) if market_value is not None else None
         unrealized_pnl_pct = (
             unrealized_pnl / total_cost * 100 if (unrealized_pnl is not None and total_cost) else None

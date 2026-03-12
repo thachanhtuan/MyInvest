@@ -1,80 +1,137 @@
 # MyInvest
 
-Personal investment tracking web application built with FastAPI, SQLAlchemy, and Bootstrap 5.
+Локальное веб-приложение для учёта личных инвестиций на российском рынке.  
+Работает полностью на вашем компьютере, не требует интернета для основных функций (только для загрузки котировок с MOEX).
 
-## Features
+---
 
-- **Accounts** – broker, IIS, deposit, and savings accounts
-- **Assets** – stocks, bonds, ETFs, deposits, gold, cash, and more
-- **Transactions** – buy, sell, dividends, coupons, amortization, deposits, and more
-- **Quotes** – manual or automatic (MOEX ISS) price fetch
-- **Bond analytics** – coupon schedule projection, bond ladder chart
-- **Portfolio analytics** – holdings, market value, P&L, asset allocation
-- **Excel import/export** – bulk data management
+## Возможности
 
-## Tech Stack
+- **Счета** — брокерские, ИИС, депозиты; аналитика по каждому счёту и сводно
+- **Справочник активов** — акции, ОФЗ, корпоративные облигации, муниципальные облигации, ETF/БПИФ, депозиты, золото, кэш
+- **Транзакции** — покупка, продажа, дивиденды, купоны, амортизация, погашение, пополнения, налоги и прочее
+- **Котировки** — ручной ввод или автоматическая загрузка с MOEX ISS (бесплатно, без API-ключей)
+- **Аналитика портфеля** — текущие позиции, рыночная стоимость, нереализованный P&L, аллокация по классам
+- **Облигационная аналитика** — лестница облигаций (по годам погашения), прогноз купонных выплат на 12 месяцев
+- **Импорт/Экспорт Excel** — загрузка данных из Excel-файла, выгрузка всей базы в Excel
 
-| Layer       | Technology                          |
-|-------------|-------------------------------------|
-| Backend     | Python 3.12 + FastAPI + uvicorn     |
-| Database    | SQLite via SQLAlchemy ORM           |
-| Excel I/O   | openpyxl                            |
-| HTTP client | httpx (MOEX API)                    |
-| Templates   | Jinja2 (server-side rendering)      |
-| Frontend    | Bootstrap 5 + Chart.js + vanilla JS |
+---
 
-## Quick Start
+## Технологический стек
+
+| Уровень      | Технология                            |
+|--------------|---------------------------------------|
+| Backend      | Python 3.12 + FastAPI + uvicorn       |
+| База данных  | SQLite (один файл `myinvest.db`)      |
+| ORM          | SQLAlchemy 2.0                        |
+| Excel I/O    | openpyxl                              |
+| HTTP-клиент  | httpx (для запросов к MOEX ISS API)   |
+| Шаблоны      | Jinja2 (серверный рендеринг)          |
+| Frontend     | Bootstrap 5 + Chart.js + vanilla JS   |
+
+---
+
+## Быстрый старт
+
+### 1. Установить зависимости
 
 ```bash
 pip install -r requirements.txt
+```
+
+### 2. Запустить приложение
+
+```bash
 python run.py
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser.
+Открыть в браузере: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
-## Excel Import Format
+База данных `myinvest.db` создаётся автоматически при первом запуске рядом с `run.py`.
 
-The Excel file should contain sheets named (in Russian):
+---
 
-| Sheet name         | Model             |
-|--------------------|-------------------|
-| Счета              | Account           |
-| Активы             | Asset             |
-| Облигации          | BondInfo          |
-| Транзакции         | Transaction       |
-| Котировки          | Quote             |
-| Купоны             | CouponPayment     |
-| Стоимость актива   | AssetValuation    |
-| Целевая аллокация  | TargetAllocation  |
+## Импорт данных из Excel
 
-First row is headers (English or Russian column names are supported).
+Перейдите на страницу **Импорт/Экспорт** и загрузите `.xlsx`-файл.
 
-## Running Tests
+Файл должен содержать листы с именами (имена листов на русском языке):
+
+| Лист                | Что импортируется   | Обязательные поля                    |
+|---------------------|---------------------|--------------------------------------|
+| `Счета`             | Счета               | id, name, type, broker_or_bank       |
+| `Активы`            | Справочник активов  | ticker, name, asset_class            |
+| `Облигации`         | Параметры облигаций | ticker                               |
+| `Транзакции`        | Транзакции          | date, account_id, ticker, tx_type    |
+| `Котировки`         | Исторические цены   | ticker, date, close_price            |
+| `Купоны`            | Купонные выплаты    | ticker, payment_date, coupon_amount  |
+| `Стоимость актива`  | Оценка брокера      | ticker, date                         |
+| `Целевая аллокация` | Целевой % по классу | asset_class, target_pct              |
+
+> Заголовки колонок могут быть как на английском (по названию поля), так и на русском языке.  
+> Структура файла подробно описана в [`docs/EXCEL_FORMAT.md`](docs/EXCEL_FORMAT.md).  
+> Справочники классов и типов — в [`docs/DATA_STRUCTURES.md`](docs/DATA_STRUCTURES.md).
+
+---
+
+## Загрузка котировок с MOEX
+
+На странице **Активы** для каждого актива доступна кнопка загрузки котировок.  
+Через API: `GET /api/quotes/fetch/{ticker}`
+
+Используется [MOEX ISS API](https://iss.moex.com) — бесплатно, без регистрации и API-ключей.
+
+---
+
+## Страницы приложения
+
+| URL              | Страница              |
+|------------------|-----------------------|
+| `/`              | Дашборд               |
+| `/accounts`      | Счета                 |
+| `/assets`        | Активы                |
+| `/transactions`  | Транзакции            |
+| `/analytics`     | Аналитика             |
+| `/bonds`         | Облигации             |
+| `/import-export` | Импорт / Экспорт      |
+
+---
+
+## API-документация
+
+FastAPI автоматически генерирует интерактивную документацию:
+
+- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
+---
+
+## Запуск тестов
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-## API Documentation
+---
 
-FastAPI auto-generates interactive docs at:
-- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- ReDoc:       [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-
-## Project Structure
+## Структура проекта
 
 ```
 app/
-├── main.py           – FastAPI app, routes
-├── database.py       – SQLAlchemy engine & session
-├── models.py         – ORM models
-├── schemas.py        – Pydantic schemas
-├── routers/          – API endpoint handlers
+├── main.py              — FastAPI-приложение, маршруты страниц
+├── database.py          — SQLAlchemy, подключение к SQLite
+├── models.py            — ORM-модели всех таблиц
+├── schemas.py           — Pydantic-схемы для API
+├── routers/             — API-обработчики (accounts, assets, transactions, ...)
 └── services/
-    ├── portfolio.py  – Holdings, P&L, allocation, bond ladder
-    ├── excel_service.py – Import/export
-    └── market_data.py   – MOEX price fetching
-templates/            – Jinja2 HTML templates
-static/               – CSS & JS assets
-tests/                – pytest test suite
+    ├── portfolio.py     — Расчёт позиций, P&L, аллокации, лестницы облигаций
+    ├── excel_service.py — Импорт/экспорт Excel
+    └── market_data.py   — Загрузка котировок с MOEX ISS
+templates/               — Jinja2-шаблоны (серверный рендеринг)
+static/                  — CSS и JavaScript
+tests/                   — Тесты pytest
+docs/                    — Документация форматов данных
+data-xlsx/               — Пример Excel-файла с данными
+run.py                   — Точка запуска приложения
+requirements.txt         — Зависимости Python
 ```
