@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Импорт данных — MyInvest{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Импорт данных</h4>
+
+<div class="row">
+  <!-- Import default file -->
+  <div class="col-md-6 mb-4">
+    <div class="card">
+      <div class="card-header">Импорт из файла по умолчанию</div>
+      <div class="card-body">
+        <p class="text-muted">Файл: <code>data-xlsx/data.xlsx</code></p>
+        <button id="btn-import-default" class="btn btn-primary" onclick="importDefault()">
+          <i class="bi bi-cloud-upload"></i> Импортировать
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload file -->
+  <div class="col-md-6 mb-4">
+    <div class="card">
+      <div class="card-header">Загрузить файл Excel</div>
+      <div class="card-body">
+        <form id="upload-form" onsubmit="importUpload(event)">
+          <div class="mb-3">
+            <input type="file" class="form-control" id="file-input" accept=".xlsx" required>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-upload"></i> Загрузить и импортировать
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Results -->
+<div id="import-result" class="d-none">
+  <div class="card">
+    <div class="card-header">Результат импорта</div>
+    <div class="card-body">
+      <table class="table table-sm" style="max-width: 400px;">
+        <tbody>
+          <tr><td>Счета</td><td id="res-accounts" class="text-end fw-bold">0</td></tr>
+          <tr><td>Активы</td><td id="res-assets" class="text-end fw-bold">0</td></tr>
+          <tr><td>Облигации</td><td id="res-bonds" class="text-end fw-bold">0</td></tr>
+          <tr><td>Транзакции</td><td id="res-transactions" class="text-end fw-bold">0</td></tr>
+          <tr><td>Стоимость активов</td><td id="res-valuations" class="text-end fw-bold">0</td></tr>
+        </tbody>
+      </table>
+      <div id="res-errors"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function showResult(data) {
+    document.getElementById('res-accounts').textContent = data.accounts;
+    document.getElementById('res-assets').textContent = data.assets;
+    document.getElementById('res-bonds').textContent = data.bonds;
+    document.getElementById('res-transactions').textContent = data.transactions;
+    document.getElementById('res-valuations').textContent = data.valuations;
+
+    const errDiv = document.getElementById('res-errors');
+    if (data.errors && data.errors.length > 0) {
+      errDiv.innerHTML = '<div class="alert alert-warning mt-3">' +
+        data.errors.map(e => escapeHtml(e)).join('<br>') + '</div>';
+    } else {
+      errDiv.innerHTML = '<div class="alert alert-success mt-3">Импорт завершён успешно!</div>';
+    }
+
+    document.getElementById('import-result').classList.remove('d-none');
+  }
+
+  async function importDefault() {
+    const btn = document.getElementById('btn-import-default');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Импорт...';
+    try {
+      const response = await fetch('/api/import/default', { method: 'POST' });
+      const data = await response.json();
+      showResult(data);
+    } catch (err) {
+      showAlert('Ошибка импорта: ' + err.message, 'danger');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-cloud-upload"></i> Импортировать';
+    }
+  }
+
+  async function importUpload(event) {
+    event.preventDefault();
+    const fileInput = document.getElementById('file-input');
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    try {
+      const response = await fetch('/api/import/excel', { method: 'POST', body: formData });
+      const data = await response.json();
+      showResult(data);
+    } catch (err) {
+      showAlert('Ошибка загрузки: ' + err.message, 'danger');
+    }
+  }
+</script>
+{% endblock %}

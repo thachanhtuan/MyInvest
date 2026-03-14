@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Счета — MyInvest{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Счета</h4>
+
+{% if accounts %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>ID</th>
+          <th>Название</th>
+          <th>Тип</th>
+          <th>Брокер / Банк</th>
+          <th>Валюта</th>
+          <th>Примечания</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for acc in accounts %}
+        <tr>
+          <td><code>{{ acc.id }}</code></td>
+          <td>{{ acc.name }}</td>
+          <td>{{ acc.type }}</td>
+          <td>{{ acc.broker_or_bank }}</td>
+          <td>{{ acc.currency }}</td>
+          <td>{{ acc.notes or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Нет данных. <a href="/import">Импортируйте данные из Excel</a>.
+</div>
+{% endif %}
+{% endblock %}

@@ -32,6 +32,9 @@ __pycache__/
 # Application database (local data, not committed)
 myinvest.db
 
+# Logs directory
+logs/
+
 # Virtual environment
 .venv/
 venv/

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Транзакции — MyInvest{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Транзакции</h4>
+
+<!-- Filters -->
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">
+    <select name="account_id" class="form-select form-select-sm">
+      <option value="">Все счета</option>
+      {% for acc in accounts %}
+      <option value="{{ acc.id }}" {% if filter_account == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <select name="ticker" class="form-select form-select-sm">
+      <option value="">Все активы</option>
+      {% for t_ticker, t_name in tickers %}
+      <option value="{{ t_ticker }}" {% if filter_ticker == t_ticker %}selected{% endif %}>{{ t_ticker }} — {{ t_name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <select name="tx_type" class="form-select form-select-sm">
+      <option value="">Все типы</option>
+      {% for key, label in tx_type_labels.items() %}
+      <option value="{{ key }}" {% if filter_tx_type == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <button type="submit" class="btn btn-sm btn-primary">Фильтр</button>
+    <a href="/transactions" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+  </div>
+</form>
+
+{% if transactions %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">
+      <thead class="table-light">
+        <tr>
+          <th>Дата</th>
+          <th>Счёт</th>
+          <th>Тикер</th>
+          <th>Тип</th>
+          <th class="text-end">Кол-во</th>
+          <th class="text-end">Цена</th>
+          <th class="text-end">Сумма</th>
+          <th class="text-end">НКД</th>
+          <th class="text-end">Комиссия</th>
+          <th class="text-end">Итого</th>
+          <th>Валюта</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in transactions %}
+        <tr>
+          <td>{{ tx.date | fdate }}</td>
+          <td>{{ tx.account_id }}</td>
+          <td><strong>{{ tx.ticker or '' }}</strong></td>
+          <td>{{ tx_type_labels.get(tx.tx_type, tx.tx_type) }}</td>
+          <td class="text-end">{{ tx.quantity if tx.quantity else '' }}</td>
+          <td class="text-end">{{ tx.price | money(tx.currency) if tx.price else '' }}</td>
+          <td class="text-end">{{ tx.amount | money(tx.currency) if tx.amount else '' }}</td>
+          <td class="text-end">{{ tx.nkd | money(tx.currency) if tx.nkd else '' }}</td>
+          <td class="text-end">{{ tx.commission | money(tx.currency) if tx.commission else '' }}</td>
+          <td class="text-end"><strong>{{ tx.total_amount | money(tx.currency) if tx.total_amount else '' }}</strong></td>
+          <td>{{ tx.currency }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted">
+    Всего записей: {{ transactions | length }}
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Нет транзакций{% if filter_account or filter_ticker or filter_tx_type %} по данному фильтру{% endif %}.
+  {% if not filter_account and not filter_ticker and not filter_tx_type %}
+  <a href="/import">Импортируйте данные из Excel</a>.
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
