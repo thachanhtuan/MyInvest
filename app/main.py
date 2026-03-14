@@ -46,7 +46,7 @@ templates.env.filters["fdate"] = format_date
 templates.env.globals["profit_class"] = profit_class
 
 # Import routers
-from app.routers import pages, import_export, accounts, assets, transactions, analytics, quotes  # noqa: E402
+from app.routers import pages, import_export, accounts, assets, transactions, analytics, quotes, currencies  # noqa: E402
 
 app.include_router(pages.router)
 app.include_router(import_export.router)
@@ -55,3 +55,4 @@ app.include_router(assets.router)
 app.include_router(transactions.router)
 app.include_router(analytics.router)
 app.include_router(quotes.router)
+app.include_router(currencies.router)

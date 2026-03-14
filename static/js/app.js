@@ -50,6 +50,8 @@ const CHART_COLORS = [
 function renderPieChart(canvasId, labels, values) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
+  const existing = Chart.getChart(ctx);
+  if (existing) existing.destroy();
   new Chart(ctx, {
     type: 'doughnut',
     data: {

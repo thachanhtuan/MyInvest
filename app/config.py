@@ -17,6 +17,9 @@ QUOTES_LOG_FILE = LOGS_DIR / "quotes.log"
 IMPORT_LOG_FILE = LOGS_DIR / "import.log"
 EXPORT_LOG_FILE = LOGS_DIR / "export.log"
 APP_LOG_FILE = LOGS_DIR / "app.log"
+CURRENCY_RATES_LOG_FILE = LOGS_DIR / "currency_rates.log"
+
+CBR_API_URL = "https://www.cbr.ru/scripts/XML_daily.asp"
 
 SHEET_NAMES = {
     "accounts": "Счета",

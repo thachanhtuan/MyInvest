@@ -70,3 +70,8 @@ def transactions_page(
 @router.get("/import")
 def import_page(request: Request):
     return templates.TemplateResponse("import.html", {"request": request})
+
+
+@router.get("/quotes")
+def quotes_page(request: Request):
+    return templates.TemplateResponse("quotes.html", {"request": request})

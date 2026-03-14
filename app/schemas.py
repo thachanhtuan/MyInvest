@@ -247,6 +247,14 @@ class QuoteResult(BaseModel):
     log_file: str | None = None
 
 
+class CurrencyRateResult(BaseModel):
+    date: datetime.date | None = None
+    updated: int = 0
+    failed: int = 0
+    errors: list[str] = []
+    log_file: str | None = None
+
+
 class ImportResult(BaseModel):
     accounts: int = 0
     assets: int = 0

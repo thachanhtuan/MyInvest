@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Котировки и курсы валют — MyInvest{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Котировки и курсы валют</h4>
+
+<div class="row">
+
+  <!-- Market quotes -->
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-graph-up"></i> Рыночные котировки
+      </div>
+      <div class="card-body d-flex flex-column">
+        <p class="text-muted">Обновляет стоимость открытых позиций из MOEX ISS и Yahoo Finance.</p>
+        <button id="btn-quotes" class="btn btn-primary mt-auto" onclick="refreshQuotes()">
+          <i class="bi bi-arrow-clockwise"></i> Обновить котировки
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CBR currency rates -->
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-currency-exchange"></i> Курсы валют ЦБР
+      </div>
+      <div class="card-body d-flex flex-column">
+        <p class="text-muted">Запрашивает курсы USD, EUR, CNY к рублю из API Центробанка на текущую дату.</p>
+        <button id="btn-rates" class="btn btn-primary mt-auto" onclick="refreshRates()">
+          <i class="bi bi-arrow-clockwise"></i> Обновить курсы валют
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Quotes result -->
+<div id="quotes-result" class="mb-4 d-none">
+  <div class="card">
+    <div class="card-header">Результат обновления котировок</div>
+    <div class="card-body">
+      <table class="table table-sm" style="max-width: 360px;">
+        <tbody>
+          <tr><td>Обновлено</td><td id="q-updated" class="text-end fw-bold"></td></tr>
+          <tr><td>Пропущено</td><td id="q-skipped" class="text-end"></td></tr>
+          <tr><td>Ошибок</td><td id="q-failed" class="text-end"></td></tr>
+        </tbody>
+      </table>
+      <div id="q-errors"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Rates result -->
+<div id="rates-result" class="mb-4 d-none">
+  <div class="card">
+    <div class="card-header">Результат обновления курсов валют</div>
+    <div class="card-body">
+      <table class="table table-sm" style="max-width: 360px;">
+        <tbody>
+          <tr><td>Дата</td><td id="r-date" class="text-end fw-bold"></td></tr>
+          <tr><td>Обновлено</td><td id="r-updated" class="text-end fw-bold"></td></tr>
+          <tr><td>Ошибок</td><td id="r-failed" class="text-end"></td></tr>
+        </tbody>
+      </table>
+      <div id="r-errors"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function refreshQuotes() {
+    const btn = document.getElementById('btn-quotes');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Обновление...';
+    document.getElementById('quotes-result').classList.add('d-none');
+    try {
+      const resp = await fetch('/api/quotes/refresh', { method: 'POST' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+
+      document.getElementById('q-updated').textContent = data.updated;
+      document.getElementById('q-skipped').textContent = data.skipped;
+      document.getElementById('q-failed').textContent = data.failed;
+
+      const errDiv = document.getElementById('q-errors');
+      if (data.errors && data.errors.length > 0) {
+        errDiv.innerHTML = '<div class="alert alert-warning mt-2">' +
+          data.errors.map(e => escapeHtml(e)).join('<br>') + '</div>';
+      } else {
+        errDiv.innerHTML = '<div class="alert alert-success mt-2">Котировки успешно обновлены.</div>';
+      }
+      document.getElementById('quotes-result').classList.remove('d-none');
+    } catch (err) {
+      showAlert('Ошибка обновления котировок: ' + err.message, 'danger');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Обновить котировки';
+    }
+  }
+
+  async function refreshRates() {
+    const btn = document.getElementById('btn-rates');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Обновление...';
+    document.getElementById('rates-result').classList.add('d-none');
+    try {
+      const resp = await fetch('/api/currencies/rates/refresh', { method: 'POST' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+
+      document.getElementById('r-date').textContent = data.date || '—';
+      document.getElementById('r-updated').textContent = data.updated;
+      document.getElementById('r-failed').textContent = data.failed;
+
+      const errDiv = document.getElementById('r-errors');
+      if (data.errors && data.errors.length > 0) {
+        errDiv.innerHTML = '<div class="alert alert-warning mt-2">' +
+          data.errors.map(e => escapeHtml(e)).join('<br>') + '</div>';
+      } else {
+        errDiv.innerHTML = '<div class="alert alert-success mt-2">Курсы валют успешно обновлены.</div>';
+      }
+      document.getElementById('rates-result').classList.remove('d-none');
+    } catch (err) {
+      showAlert('Ошибка обновления курсов: ' + err.message, 'danger');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Обновить курсы валют';
+    }
+  }
+</script>
+{% endblock %}

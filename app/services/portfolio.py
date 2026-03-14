@@ -5,7 +5,7 @@ from collections import defaultdict
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Account, Asset, AssetValuation, Transaction
+from app.models import Account, Asset, AssetValuation, CurrencyRate, Transaction
 from app.schemas import (
     ASSET_CLASS_LABELS,
     AccountSummary,
@@ -60,6 +60,28 @@ def _get_holdings(db: Session) -> list[HoldingInfo]:
     for v in vals:
         latest_vals[v.ticker] = v
 
+    # Latest currency rates (most recent date per currency)
+    latest_rates: dict[str, float] = {"RUB": 1.0}  # RUB to RUB = 1
+    rate_subq = (
+        db.query(
+            CurrencyRate.currency,
+            func.max(CurrencyRate.date).label("max_date"),
+        )
+        .group_by(CurrencyRate.currency)
+        .subquery()
+    )
+    rates = (
+        db.query(CurrencyRate)
+        .join(
+            rate_subq,
+            (CurrencyRate.currency == rate_subq.c.currency)
+            & (CurrencyRate.date == rate_subq.c.max_date),
+        )
+        .all()
+    )
+    for r in rates:
+        latest_rates[r.currency] = r.rate
+
     # Aggregate per (account_id, ticker)
     key_quantity: dict[tuple[str, str], float] = defaultdict(float)
     key_invested: dict[tuple[str, str], float] = defaultdict(float)
@@ -104,9 +126,14 @@ def _get_holdings(db: Session) -> list[HoldingInfo]:
                 q for (a, t), q in key_quantity.items() if t == ticker and q > 0
             )
             if total_qty_for_ticker > 0:
-                current_value = val.value * (quantity / total_qty_for_ticker)
+                value_in_asset_currency = val.value * (quantity / total_qty_for_ticker)
             else:
-                current_value = total_invested
+                value_in_asset_currency = total_invested
+
+            # Convert to RUB using currency rate
+            val_currency = val.currency or asset.currency or "RUB"
+            rate = latest_rates.get(val_currency, 1.0)
+            current_value = value_in_asset_currency * rate
         else:
             current_value = total_invested
 

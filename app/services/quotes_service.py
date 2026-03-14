@@ -83,13 +83,22 @@ def _get_open_positions(db: Session) -> dict[str, dict]:
 def _fetch_moex_price(ticker: str, asset_class: str, face_value: float) -> float | None:
     """Fetch price from MOEX ISS.
 
-    Bonds: returns price per bond in RUB (converted from % of face value).
+    Bonds: returns price in RUB converted from % of face value.
     Stocks/ETF: returns price per share in RUB.
+
+    Price lookup (in priority order):
+      marketdata.LAST      — last trade, real-time (during session)
+      marketdata.WAPRICE   — session VWAP
+      securities.PREVPRICE — previous session close (always populated)
+
+    Uses primary trading board: TQBR for stocks, TQCB/TQOB for bonds.
     """
     market = "bonds" if asset_class in _BOND_CLASSES else "shares"
     url = (
         f"{MOEX_ISS_BASE_URL}/engines/stock/markets/{market}/securities/{ticker}.json"
-        "?iss.meta=off&iss.only=marketdata&marketdata.columns=SECID,LAST,CLOSE"
+        "?iss.meta=off&iss.only=marketdata,securities"
+        "&marketdata.columns=SECID,BOARDID,LAST,WAPRICE"
+        "&securities.columns=SECID,BOARDID,PREVPRICE"
     )
 
     logger.debug(f"MOEX request: {url}")
@@ -110,52 +119,66 @@ def _fetch_moex_price(ticker: str, asset_class: str, face_value: float) -> float
 
     try:
         md = data["marketdata"]
-        columns = md["columns"]
-        rows = md["data"]
-
-        # Find available price columns
-        last_idx = columns.index("LAST") if "LAST" in columns else None
-        close_idx = columns.index("CLOSE") if "CLOSE" in columns else None
-
-        if last_idx is None and close_idx is None:
-            logger.warning(
-                f"MOEX response for {ticker} has no LAST or CLOSE columns. "
-                f"Available columns: {columns}"
-            )
-            return None
-
-    except (KeyError, ValueError) as exc:
+        sec = data["securities"]
+    except KeyError as exc:
         logger.warning(f"Unexpected MOEX response structure for {ticker}: {exc}")
         logger.debug(f"MOEX response: {data}")
         return None
 
-    raw_price: float | None = None
-    for row in rows:
-        if not row:
-            continue
-        # Try LAST first, then CLOSE
-        if last_idx is not None:
-            val = row[last_idx]
-            if val is not None and float(val) > 0:
-                raw_price = float(val)
-                break
-        if close_idx is not None:
-            val = row[close_idx]
-            if val is not None and float(val) > 0:
-                raw_price = float(val)
-                break
+    # Preferred trading boards
+    if market == "bonds":
+        preferred_boards = ["TQCB", "TQOB", "TQIR"]  # corp, gov, eurobonds
+    else:
+        preferred_boards = ["TQBR"]  # stocks main board
+
+    def _first_positive(
+        rows: list, columns: list, fields: list, preferred_boards: list | None = None
+    ) -> tuple[float, str] | tuple[None, None]:
+        """Find first positive value in rows, preferring specified BOARDIDs."""
+        field_idx = {f: columns.index(f) for f in fields if f in columns}
+        board_idx = columns.index("BOARDID") if "BOARDID" in columns else None
+
+        # Try preferred boards first
+        if preferred_boards and board_idx is not None:
+            for board in preferred_boards:
+                for row in rows:
+                    if not row or row[board_idx] != board:
+                        continue
+                    for field in fields:
+                        i = field_idx.get(field)
+                        if i is not None:
+                            val = row[i]
+                            if val is not None and float(val) > 0:
+                                return float(val), field
+
+        # Fallback: any board with positive value
+        for row in rows:
+            if not row:
+                continue
+            for field in fields:
+                i = field_idx.get(field)
+                if i is not None:
+                    val = row[i]
+                    if val is not None and float(val) > 0:
+                        return float(val), field
+
+        return None, None
+
+    # Real-time price from marketdata, fallback to previous session from securities
+    raw_price, used_field = _first_positive(md["data"], md["columns"], ["LAST", "WAPRICE"], preferred_boards)
+    if raw_price is None:
+        raw_price, used_field = _first_positive(sec["data"], sec["columns"], ["PREVPRICE"], preferred_boards)
 
     if raw_price is None:
         logger.info(f"No price data from MOEX for {ticker} (market={market})")
         return None
 
     if asset_class in _BOND_CLASSES:
-        # MOEX bond prices are in % of face value (e.g. 96.5 means 96.5% of face_value)
         price = (raw_price / 100.0) * face_value
-        logger.debug(f"MOEX bond {ticker}: raw={raw_price}%, face={face_value}, price={price}")
+        logger.debug(f"MOEX bond {ticker}: {used_field}={raw_price}%, face={face_value}, price={price}")
         return price
 
-    logger.debug(f"MOEX stock/etf {ticker}: price={raw_price}")
+    logger.debug(f"MOEX stock/etf {ticker}: {used_field}={raw_price}")
     return raw_price
 
 

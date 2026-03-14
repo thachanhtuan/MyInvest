@@ -108,3 +108,24 @@ class AssetValuation(Base):
     value_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     asset: Mapped[Asset] = relationship(back_populates="valuations")
+
+
+class Currency(Base):
+    __tablename__ = "currencies"
+
+    code: Mapped[str] = mapped_column(String(3), primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    symbol: Mapped[str | None] = mapped_column(String(4), nullable=True)
+
+
+class CurrencyRate(Base):
+    __tablename__ = "currency_rates"
+    __table_args__ = (
+        UniqueConstraint("date", "currency", name="uq_currency_rate_date_currency"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    rate: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str | None] = mapped_column(String, nullable=True)

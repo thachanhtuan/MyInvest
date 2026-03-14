@@ -41,6 +41,11 @@
             <i class="bi bi-cloud-upload"></i> Импорт
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link text-white {% if '/quotes' in request.url.path %}active bg-secondary rounded{% endif %}" href="/quotes">
+            <i class="bi bi-arrow-repeat"></i> Котировки
+          </a>
+        </li>
       </ul>
     </nav>
 
