@@ -197,6 +197,12 @@ def _upsert_valuation(
 
 def fetch_all_quotes(db: Session) -> QuoteResult:
     """Fetch current market quotes for all open positions and upsert asset_valuations."""
+    # DIAGNOSTIC: direct file write, bypasses logging — remove after debug
+    import pathlib as _pl
+    _dbg = _pl.Path("logs/DEBUG_was_here.txt")
+    _dbg.parent.mkdir(exist_ok=True)
+    _dbg.write_text(f"fetch_all_quotes called at {datetime.datetime.now()}\nfile={__file__}\n")
+
     today = datetime.date.today()
     positions = _get_open_positions(db)
     result = QuoteResult(log_file=str(QUOTES_LOG_FILE))
@@ -225,7 +231,7 @@ def fetch_all_quotes(db: Session) -> QuoteResult:
 
             if price is None:
                 result.failed += 1
-                error_msg = f"{ticker}: цена не получена от {source}"
+                error_msg = f"{ticker}: цена не получена от {source} [DBG]"
                 result.errors.append(error_msg)
                 logger.warning(f"FAIL {ticker}: no price returned from {source}")
                 continue
