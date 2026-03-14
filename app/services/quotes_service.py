@@ -74,6 +74,7 @@ def _get_open_positions(db: Session) -> dict[str, dict]:
             "face_value": bond.face_value if bond else 1.0,
             "total_qty": qty,
             "currency": asset.currency,
+            "isin": asset.isin,
         }
 
     return positions
@@ -197,12 +198,6 @@ def _upsert_valuation(
 
 def fetch_all_quotes(db: Session) -> QuoteResult:
     """Fetch current market quotes for all open positions and upsert asset_valuations."""
-    # DIAGNOSTIC: direct file write, bypasses logging — remove after debug
-    import pathlib as _pl
-    _dbg = _pl.Path("logs/DEBUG_was_here.txt")
-    _dbg.parent.mkdir(exist_ok=True)
-    _dbg.write_text(f"fetch_all_quotes called at {datetime.datetime.now()}\nfile={__file__}\n")
-
     today = datetime.date.today()
     positions = _get_open_positions(db)
     result = QuoteResult(log_file=str(QUOTES_LOG_FILE))
@@ -218,20 +213,27 @@ def fetch_all_quotes(db: Session) -> QuoteResult:
             logger.info(f"SKIP {ticker}: asset_class={pos['asset_class']} (no quotes needed)")
             continue
 
+        query_code = pos["isin"]
+        if not query_code:
+            result.failed += 1
+            result.errors.append(f"{ticker}: ISIN не заполнен (ошибка данных)")
+            logger.error(f"FAIL {ticker}: isin is empty — data error")
+            continue
+
         logger.info(
-            f"FETCH {ticker}: source={source}, asset_class={pos['asset_class']}, "
-            f"qty={pos['total_qty']}, face_value={pos['face_value']}"
+            f"FETCH {ticker} (isin={query_code}): source={source}, "
+            f"asset_class={pos['asset_class']}, qty={pos['total_qty']}, face_value={pos['face_value']}"
         )
 
         try:
             if source == "moex":
-                price = _fetch_moex_price(ticker, pos["asset_class"], pos["face_value"])
+                price = _fetch_moex_price(query_code, pos["asset_class"], pos["face_value"])
             else:
-                price = _fetch_yahoo_price(ticker)
+                price = _fetch_yahoo_price(query_code)
 
             if price is None:
                 result.failed += 1
-                error_msg = f"{ticker}: цена не получена от {source} [DBG]"
+                error_msg = f"{ticker}: цена не получена от {source}"
                 result.errors.append(error_msg)
                 logger.warning(f"FAIL {ticker}: no price returned from {source}")
                 continue
